@@ -21,6 +21,12 @@ func newInterpreter() *treeInterpreter {
 	return &interpreter
 }
 
+func newInterpreterWithCustomFunctions(customFuncs []FunctionEntry) *treeInterpreter {
+	interpreter := treeInterpreter{}
+	interpreter.fCall = newFunctionCallerWithCustomFunctions(customFuncs)
+	return &interpreter
+}
+
 type expRef struct {
 	ref ASTNode
 }

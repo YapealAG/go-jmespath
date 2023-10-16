@@ -12,31 +12,31 @@ import (
 	"unicode/utf8"
 )
 
-type jpFunction func(arguments []interface{}) (interface{}, error)
+type JpFunction func(arguments []interface{}) (interface{}, error)
 
-type jpType string
+type JpType string
 
 const (
-	jpNumber      jpType = "number"
-	jpString      jpType = "string"
-	jpArray       jpType = "array"
-	jpObject      jpType = "object"
-	jpArrayNumber jpType = "array[number]"
-	jpArrayString jpType = "array[string]"
-	jpExpref      jpType = "expref"
-	jpAny         jpType = "any"
+	JpNumber      JpType = "number"
+	JpString      JpType = "string"
+	JpArray       JpType = "array"
+	JpObject      JpType = "object"
+	JpArrayNumber JpType = "array[number]"
+	JpArrayString JpType = "array[string]"
+	JpExpref      JpType = "expref"
+	JpAny         JpType = "any"
 )
 
-type functionEntry struct {
-	name      string
-	arguments []argSpec
-	handler   jpFunction
+type FunctionEntry struct {
+	Name      string
+	Arguments []ArgSpec
+	Handler   JpFunction
 	hasExpRef bool
 }
 
-type argSpec struct {
-	types    []jpType
-	variadic bool
+type ArgSpec struct {
+	Types    []JpType
+	Variadic bool
 }
 
 type byExprString struct {
@@ -49,9 +49,11 @@ type byExprString struct {
 func (a *byExprString) Len() int {
 	return len(a.items)
 }
+
 func (a *byExprString) Swap(i, j int) {
 	a.items[i], a.items[j] = a.items[j], a.items[i]
 }
+
 func (a *byExprString) Less(i, j int) bool {
 	first, err := a.intr.Execute(a.node, a.items[i])
 	if err != nil {
@@ -88,9 +90,11 @@ type byExprFloat struct {
 func (a *byExprFloat) Len() int {
 	return len(a.items)
 }
+
 func (a *byExprFloat) Swap(i, j int) {
 	a.items[i], a.items[j] = a.items[j], a.items[i]
 }
+
 func (a *byExprFloat) Less(i, j int) bool {
 	first, err := a.intr.Execute(a.node, a.items[i])
 	if err != nil {
@@ -118,219 +122,229 @@ func (a *byExprFloat) Less(i, j int) bool {
 }
 
 type functionCaller struct {
-	functionTable map[string]functionEntry
+	functionTable map[string]FunctionEntry
+}
+
+func newFunctionCallerWithCustomFunctions(customFuncs []FunctionEntry) *functionCaller {
+	caller := newFunctionCaller()
+
+	for _, f := range customFuncs {
+		caller.functionTable[f.Name] = f
+	}
+
+	return caller
 }
 
 func newFunctionCaller() *functionCaller {
 	caller := &functionCaller{}
-	caller.functionTable = map[string]functionEntry{
+	caller.functionTable = map[string]FunctionEntry{
 		"length": {
-			name: "length",
-			arguments: []argSpec{
-				{types: []jpType{jpString, jpArray, jpObject}},
+			Name: "length",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpString, JpArray, JpObject}},
 			},
-			handler: jpfLength,
+			Handler: jpfLength,
 		},
 		"starts_with": {
-			name: "starts_with",
-			arguments: []argSpec{
-				{types: []jpType{jpString}},
-				{types: []jpType{jpString}},
+			Name: "starts_with",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpString}},
+				{Types: []JpType{JpString}},
 			},
-			handler: jpfStartsWith,
+			Handler: jpfStartsWith,
 		},
 		"abs": {
-			name: "abs",
-			arguments: []argSpec{
-				{types: []jpType{jpNumber}},
+			Name: "abs",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpNumber}},
 			},
-			handler: jpfAbs,
+			Handler: jpfAbs,
 		},
 		"avg": {
-			name: "avg",
-			arguments: []argSpec{
-				{types: []jpType{jpArrayNumber}},
+			Name: "avg",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpArrayNumber}},
 			},
-			handler: jpfAvg,
+			Handler: jpfAvg,
 		},
 		"ceil": {
-			name: "ceil",
-			arguments: []argSpec{
-				{types: []jpType{jpNumber}},
+			Name: "ceil",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpNumber}},
 			},
-			handler: jpfCeil,
+			Handler: jpfCeil,
 		},
 		"contains": {
-			name: "contains",
-			arguments: []argSpec{
-				{types: []jpType{jpArray, jpString}},
-				{types: []jpType{jpAny}},
+			Name: "contains",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpArray, JpString}},
+				{Types: []JpType{JpAny}},
 			},
-			handler: jpfContains,
+			Handler: jpfContains,
 		},
 		"ends_with": {
-			name: "ends_with",
-			arguments: []argSpec{
-				{types: []jpType{jpString}},
-				{types: []jpType{jpString}},
+			Name: "ends_with",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpString}},
+				{Types: []JpType{JpString}},
 			},
-			handler: jpfEndsWith,
+			Handler: jpfEndsWith,
 		},
 		"floor": {
-			name: "floor",
-			arguments: []argSpec{
-				{types: []jpType{jpNumber}},
+			Name: "floor",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpNumber}},
 			},
-			handler: jpfFloor,
+			Handler: jpfFloor,
 		},
 		"map": {
-			name: "amp",
-			arguments: []argSpec{
-				{types: []jpType{jpExpref}},
-				{types: []jpType{jpArray}},
+			Name: "amp",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpExpref}},
+				{Types: []JpType{JpArray}},
 			},
-			handler:   jpfMap,
+			Handler:   jpfMap,
 			hasExpRef: true,
 		},
 		"max": {
-			name: "max",
-			arguments: []argSpec{
-				{types: []jpType{jpArrayNumber, jpArrayString}},
+			Name: "max",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpArrayNumber, JpArrayString}},
 			},
-			handler: jpfMax,
+			Handler: jpfMax,
 		},
 		"merge": {
-			name: "merge",
-			arguments: []argSpec{
-				{types: []jpType{jpObject}, variadic: true},
+			Name: "merge",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpObject}, Variadic: true},
 			},
-			handler: jpfMerge,
+			Handler: jpfMerge,
 		},
 		"max_by": {
-			name: "max_by",
-			arguments: []argSpec{
-				{types: []jpType{jpArray}},
-				{types: []jpType{jpExpref}},
+			Name: "max_by",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpArray}},
+				{Types: []JpType{JpExpref}},
 			},
-			handler:   jpfMaxBy,
+			Handler:   jpfMaxBy,
 			hasExpRef: true,
 		},
 		"sum": {
-			name: "sum",
-			arguments: []argSpec{
-				{types: []jpType{jpArrayNumber}},
+			Name: "sum",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpArrayNumber}},
 			},
-			handler: jpfSum,
+			Handler: jpfSum,
 		},
 		"min": {
-			name: "min",
-			arguments: []argSpec{
-				{types: []jpType{jpArrayNumber, jpArrayString}},
+			Name: "min",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpArrayNumber, JpArrayString}},
 			},
-			handler: jpfMin,
+			Handler: jpfMin,
 		},
 		"min_by": {
-			name: "min_by",
-			arguments: []argSpec{
-				{types: []jpType{jpArray}},
-				{types: []jpType{jpExpref}},
+			Name: "min_by",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpArray}},
+				{Types: []JpType{JpExpref}},
 			},
-			handler:   jpfMinBy,
+			Handler:   jpfMinBy,
 			hasExpRef: true,
 		},
 		"type": {
-			name: "type",
-			arguments: []argSpec{
-				{types: []jpType{jpAny}},
+			Name: "type",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpAny}},
 			},
-			handler: jpfType,
+			Handler: jpfType,
 		},
 		"keys": {
-			name: "keys",
-			arguments: []argSpec{
-				{types: []jpType{jpObject}},
+			Name: "keys",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpObject}},
 			},
-			handler: jpfKeys,
+			Handler: jpfKeys,
 		},
 		"values": {
-			name: "values",
-			arguments: []argSpec{
-				{types: []jpType{jpObject}},
+			Name: "values",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpObject}},
 			},
-			handler: jpfValues,
+			Handler: jpfValues,
 		},
 		"sort": {
-			name: "sort",
-			arguments: []argSpec{
-				{types: []jpType{jpArrayString, jpArrayNumber}},
+			Name: "sort",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpArrayString, JpArrayNumber}},
 			},
-			handler: jpfSort,
+			Handler: jpfSort,
 		},
 		"sort_by": {
-			name: "sort_by",
-			arguments: []argSpec{
-				{types: []jpType{jpArray}},
-				{types: []jpType{jpExpref}},
+			Name: "sort_by",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpArray}},
+				{Types: []JpType{JpExpref}},
 			},
-			handler:   jpfSortBy,
+			Handler:   jpfSortBy,
 			hasExpRef: true,
 		},
 		"join": {
-			name: "join",
-			arguments: []argSpec{
-				{types: []jpType{jpString}},
-				{types: []jpType{jpArrayString}},
+			Name: "join",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpString}},
+				{Types: []JpType{JpArrayString}},
 			},
-			handler: jpfJoin,
+			Handler: jpfJoin,
 		},
 		"reverse": {
-			name: "reverse",
-			arguments: []argSpec{
-				{types: []jpType{jpArray, jpString}},
+			Name: "reverse",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpArray, JpString}},
 			},
-			handler: jpfReverse,
+			Handler: jpfReverse,
 		},
 		"to_array": {
-			name: "to_array",
-			arguments: []argSpec{
-				{types: []jpType{jpAny}},
+			Name: "to_array",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpAny}},
 			},
-			handler: jpfToArray,
+			Handler: jpfToArray,
 		},
 		"to_string": {
-			name: "to_string",
-			arguments: []argSpec{
-				{types: []jpType{jpAny}},
+			Name: "to_string",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpAny}},
 			},
-			handler: jpfToString,
+			Handler: jpfToString,
 		},
 		"to_number": {
-			name: "to_number",
-			arguments: []argSpec{
-				{types: []jpType{jpAny}},
+			Name: "to_number",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpAny}},
 			},
-			handler: jpfToNumber,
+			Handler: jpfToNumber,
 		},
 		"not_null": {
-			name: "not_null",
-			arguments: []argSpec{
-				{types: []jpType{jpAny}, variadic: true},
+			Name: "not_null",
+			Arguments: []ArgSpec{
+				{Types: []JpType{JpAny}, Variadic: true},
 			},
-			handler: jpfNotNull,
+			Handler: jpfNotNull,
 		},
 	}
 	return caller
 }
 
-func (e *functionEntry) resolveArgs(arguments []interface{}) ([]interface{}, error) {
-	if len(e.arguments) == 0 {
+func (e *FunctionEntry) resolveArgs(arguments []interface{}) ([]interface{}, error) {
+	if len(e.Arguments) == 0 {
 		return arguments, nil
 	}
-	if !e.arguments[len(e.arguments)-1].variadic {
-		if len(e.arguments) != len(arguments) {
+	if !e.Arguments[len(e.Arguments)-1].Variadic {
+		if len(e.Arguments) != len(arguments) {
 			return nil, errors.New("incorrect number of args")
 		}
-		for i, spec := range e.arguments {
+		for i, spec := range e.Arguments {
 			userArg := arguments[i]
 			err := spec.typeCheck(userArg)
 			if err != nil {
@@ -339,48 +353,48 @@ func (e *functionEntry) resolveArgs(arguments []interface{}) ([]interface{}, err
 		}
 		return arguments, nil
 	}
-	if len(arguments) < len(e.arguments) {
+	if len(arguments) < len(e.Arguments) {
 		return nil, errors.New("invalid arity")
 	}
 	return arguments, nil
 }
 
-func (a *argSpec) typeCheck(arg interface{}) error {
-	for _, t := range a.types {
+func (a *ArgSpec) typeCheck(arg interface{}) error {
+	for _, t := range a.Types {
 		switch t {
-		case jpNumber:
+		case JpNumber:
 			if _, ok := arg.(float64); ok {
 				return nil
 			}
-		case jpString:
+		case JpString:
 			if _, ok := arg.(string); ok {
 				return nil
 			}
-		case jpArray:
+		case JpArray:
 			if isSliceType(arg) {
 				return nil
 			}
-		case jpObject:
+		case JpObject:
 			if _, ok := arg.(map[string]interface{}); ok {
 				return nil
 			}
-		case jpArrayNumber:
+		case JpArrayNumber:
 			if _, ok := toArrayNum(arg); ok {
 				return nil
 			}
-		case jpArrayString:
+		case JpArrayString:
 			if _, ok := toArrayStr(arg); ok {
 				return nil
 			}
-		case jpAny:
+		case JpAny:
 			return nil
-		case jpExpref:
+		case JpExpref:
 			if _, ok := arg.(expRef); ok {
 				return nil
 			}
 		}
 	}
-	return fmt.Errorf("Invalid type for: %v, expected: %#v", arg, a.types)
+	return fmt.Errorf("Invalid type for: %v, expected: %#v", arg, a.Types)
 }
 
 func (f *functionCaller) CallFunction(name string, arguments []interface{}, intr *treeInterpreter) (interface{}, error) {
@@ -397,7 +411,7 @@ func (f *functionCaller) CallFunction(name string, arguments []interface{}, intr
 		extra = append(extra, intr)
 		resolvedArgs = append(extra, resolvedArgs...)
 	}
-	return entry.handler(resolvedArgs)
+	return entry.Handler(resolvedArgs)
 }
 
 func jpfAbs(arguments []interface{}) (interface{}, error) {
@@ -435,10 +449,12 @@ func jpfAvg(arguments []interface{}) (interface{}, error) {
 	}
 	return numerator / length, nil
 }
+
 func jpfCeil(arguments []interface{}) (interface{}, error) {
 	val := arguments[0].(float64)
 	return math.Ceil(val), nil
 }
+
 func jpfContains(arguments []interface{}) (interface{}, error) {
 	search := arguments[0]
 	el := arguments[1]
@@ -457,15 +473,18 @@ func jpfContains(arguments []interface{}) (interface{}, error) {
 	}
 	return false, nil
 }
+
 func jpfEndsWith(arguments []interface{}) (interface{}, error) {
 	search := arguments[0].(string)
 	suffix := arguments[1].(string)
 	return strings.HasSuffix(search, suffix), nil
 }
+
 func jpfFloor(arguments []interface{}) (interface{}, error) {
 	val := arguments[0].(float64)
 	return math.Floor(val), nil
 }
+
 func jpfMap(arguments []interface{}) (interface{}, error) {
 	intr := arguments[0].(*treeInterpreter)
 	exp := arguments[1].(expRef)
@@ -481,6 +500,7 @@ func jpfMap(arguments []interface{}) (interface{}, error) {
 	}
 	return mapped, nil
 }
+
 func jpfMax(arguments []interface{}) (interface{}, error) {
 	if items, ok := toArrayNum(arguments[0]); ok {
 		if len(items) == 0 {
@@ -513,6 +533,7 @@ func jpfMax(arguments []interface{}) (interface{}, error) {
 	}
 	return best, nil
 }
+
 func jpfMerge(arguments []interface{}) (interface{}, error) {
 	final := make(map[string]interface{})
 	for _, m := range arguments {
@@ -523,6 +544,7 @@ func jpfMerge(arguments []interface{}) (interface{}, error) {
 	}
 	return final, nil
 }
+
 func jpfMaxBy(arguments []interface{}) (interface{}, error) {
 	intr := arguments[0].(*treeInterpreter)
 	arr := arguments[1].([]interface{})
@@ -578,6 +600,7 @@ func jpfMaxBy(arguments []interface{}) (interface{}, error) {
 		return nil, errors.New("invalid type, must be number of string")
 	}
 }
+
 func jpfSum(arguments []interface{}) (interface{}, error) {
 	items, _ := toArrayNum(arguments[0])
 	sum := 0.0
@@ -673,6 +696,7 @@ func jpfMinBy(arguments []interface{}) (interface{}, error) {
 		return nil, errors.New("invalid type, must be number of string")
 	}
 }
+
 func jpfType(arguments []interface{}) (interface{}, error) {
 	arg := arguments[0]
 	if _, ok := arg.(float64); ok {
@@ -695,6 +719,7 @@ func jpfType(arguments []interface{}) (interface{}, error) {
 	}
 	return nil, errors.New("unknown type")
 }
+
 func jpfKeys(arguments []interface{}) (interface{}, error) {
 	arg := arguments[0].(map[string]interface{})
 	collected := make([]interface{}, 0, len(arg))
@@ -703,6 +728,7 @@ func jpfKeys(arguments []interface{}) (interface{}, error) {
 	}
 	return collected, nil
 }
+
 func jpfValues(arguments []interface{}) (interface{}, error) {
 	arg := arguments[0].(map[string]interface{})
 	collected := make([]interface{}, 0, len(arg))
@@ -711,6 +737,7 @@ func jpfValues(arguments []interface{}) (interface{}, error) {
 	}
 	return collected, nil
 }
+
 func jpfSort(arguments []interface{}) (interface{}, error) {
 	if items, ok := toArrayNum(arguments[0]); ok {
 		d := sort.Float64Slice(items)
@@ -731,6 +758,7 @@ func jpfSort(arguments []interface{}) (interface{}, error) {
 	}
 	return final, nil
 }
+
 func jpfSortBy(arguments []interface{}) (interface{}, error) {
 	intr := arguments[0].(*treeInterpreter)
 	arr := arguments[1].([]interface{})
@@ -763,6 +791,7 @@ func jpfSortBy(arguments []interface{}) (interface{}, error) {
 		return nil, errors.New("invalid type, must be number of string")
 	}
 }
+
 func jpfJoin(arguments []interface{}) (interface{}, error) {
 	sep := arguments[0].(string)
 	// We can't just do arguments[1].([]string), we have to
@@ -773,6 +802,7 @@ func jpfJoin(arguments []interface{}) (interface{}, error) {
 	}
 	return strings.Join(arrayStr, sep), nil
 }
+
 func jpfReverse(arguments []interface{}) (interface{}, error) {
 	if s, ok := arguments[0].(string); ok {
 		r := []rune(s)
@@ -789,12 +819,14 @@ func jpfReverse(arguments []interface{}) (interface{}, error) {
 	}
 	return reversed, nil
 }
+
 func jpfToArray(arguments []interface{}) (interface{}, error) {
 	if _, ok := arguments[0].([]interface{}); ok {
 		return arguments[0], nil
 	}
 	return arguments[:1:1], nil
 }
+
 func jpfToString(arguments []interface{}) (interface{}, error) {
 	if v, ok := arguments[0].(string); ok {
 		return v, nil
@@ -805,6 +837,7 @@ func jpfToString(arguments []interface{}) (interface{}, error) {
 	}
 	return string(result), nil
 }
+
 func jpfToNumber(arguments []interface{}) (interface{}, error) {
 	arg := arguments[0]
 	if v, ok := arg.(float64); ok {
@@ -831,6 +864,7 @@ func jpfToNumber(arguments []interface{}) (interface{}, error) {
 	}
 	return nil, errors.New("unknown type")
 }
+
 func jpfNotNull(arguments []interface{}) (interface{}, error) {
 	for _, arg := range arguments {
 		if arg != nil {

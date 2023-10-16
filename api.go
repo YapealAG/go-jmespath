@@ -12,12 +12,29 @@ type JMESPath struct {
 // Compile parses a JMESPath expression and returns, if successful, a JMESPath
 // object that can be used to match against data.
 func Compile(expression string) (*JMESPath, error) {
+	intr := newInterpreter()
+
 	parser := NewParser()
-	ast, err := parser.Parse(expression)
+	ast, err := parser.Parse(expression, intr)
 	if err != nil {
 		return nil, err
 	}
-	jmespath := &JMESPath{ast: ast, intr: newInterpreter()}
+	jmespath := &JMESPath{ast: ast, intr: intr}
+	return jmespath, nil
+}
+
+// CompileWithFunctions parses a JMESPath expression and returns, if successful, a JMESPath
+// object that can be used to match against data.
+func CompileWithFunctions(expression string, customFuncs []FunctionEntry) (*JMESPath, error) {
+	intr := newInterpreterWithCustomFunctions(customFuncs)
+
+	parser := NewParser()
+	ast, err := parser.Parse(expression, intr)
+	if err != nil {
+		return nil, err
+	}
+	jmespath := &JMESPath{ast: ast, intr: intr}
+
 	return jmespath, nil
 }
 
@@ -41,7 +58,7 @@ func (jp *JMESPath) Search(data interface{}) (interface{}, error) {
 func Search(expression string, data interface{}) (interface{}, error) {
 	intr := newInterpreter()
 	parser := NewParser()
-	ast, err := parser.Parse(expression)
+	ast, err := parser.Parse(expression, intr)
 	if err != nil {
 		return nil, err
 	}
