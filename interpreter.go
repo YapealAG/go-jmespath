@@ -3,8 +3,6 @@ package jmespath
 import (
 	"errors"
 	"reflect"
-	"unicode"
-	"unicode/utf8"
 )
 
 /* This is a tree based interpreter.  It walks the AST and directly
@@ -322,10 +320,8 @@ func (intr *treeInterpreter) Execute(node ASTNode, value interface{}) (interface
 
 func (intr *treeInterpreter) fieldFromStruct(key string, value interface{}) (interface{}, error) {
 	rv := reflect.ValueOf(value)
-	first, n := utf8.DecodeRuneInString(key)
-	fieldName := string(unicode.ToUpper(first)) + key[n:]
 	if rv.Kind() == reflect.Struct {
-		v := rv.FieldByName(fieldName)
+		v := rv.FieldByName(key)
 		if !v.IsValid() {
 			return nil, nil
 		}
@@ -336,7 +332,7 @@ func (intr *treeInterpreter) fieldFromStruct(key string, value interface{}) (int
 			return nil, nil
 		}
 		rv = rv.Elem()
-		v := rv.FieldByName(fieldName)
+		v := rv.FieldByName(key)
 		if !v.IsValid() {
 			return nil, nil
 		}
